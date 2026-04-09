@@ -7,15 +7,22 @@ const App = () => {
   const [editId, setEditId] = useState(null);
   const [editItem, setEditItem] = useState("");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const fetchItems = async () => {
+    setLoading(true);
+    setError("");
+
     try {
       const response = await axios.get(`https://todo-backend-1-qwqv.onrender.com/api/tasks`);
       setItems(response.data.data);
+    }catch (err) {
+      console.log(err);
+      setError("Failed to fetch tasks");
     }
-    catch (err) {
-      alert("Unable to fetch tasks from the server");
-    }
+
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -23,33 +30,74 @@ const App = () => {
   }, []);
 
   const handleAdd = async () => {
-    if (!item) return alert("Enter task");
+    if (item.trim().length < 3) {
+      return alert("Task must be at least 3 characters");
+    }
+
+    setLoading(true);
+
     try {
       await axios.post(`https://todo-backend-1-qwqv.onrender.com/api/tasks`, { data: { title: item}});
       setItem('');
       fetchItems();
     } catch (err) {
-      alert("Error adding task");
+      console.log(err);
+      setError("Error adding task");
     }
+
+    setLoading(false);
   }
 
   const handleDelete = async (id) => {
-    await axios.delete(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}`);
-    fetchItems();
+    try {
+      await axios.delete(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}`);
+      fetchItems();
+    } catch (err) {
+      console.log(err);
+      setError("Error deleting task");
+    }
   }
 
   const handleToggle = async (id) => {
-    await axios.put(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}/toggle`);
-    fetchItems();
+    try {
+      await axios.put(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}/toggle`);
+      fetchItems();
+    } catch (err) {
+      console.log(err);
+      setError("Error updating task");
+    }
   }
 
   const handleUpdate = async (id) => {
-    await axios.put(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}`, { data: { title: editItem }});
-    setEditId(null);
-    fetchItems();
+    if (editItem.trim().length < 3) {
+      return alert("Task must be at least 3 characters");
+    }
+    
+    try {
+      await axios.put(`https://todo-backend-1-qwqv.onrender.com/api/tasks/${id}`, { data: { title: editItem }});
+      setEditId(null);
+      fetchItems();
+    } catch (err) {
+      console.log(err);
+      setError("Error updating task");
+    }
   }
 
-  const searchItems = items.filter((task) => task.title.toLowerCase().includes(search.toLowerCase()));
+  const handleSearch = async (value) => {
+    setSearch(value);
+
+    if (!value) {
+      return fetchItems();
+    }
+
+    try {
+      const response = await axios.get(`https://todo-backend-1-qwqv.onrender.com/api/tasks/search?term=${value}`);
+      setItems(response.data.data);
+    } catch (err) {
+      console.log(err);
+      setError("Search failed");
+    }
+  }  
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -61,15 +109,23 @@ const App = () => {
           <button className="bg-blue-500 text-white px-4 py-2 rounded-lg" onClick={handleAdd}>Add</button>
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <input type="text" placeholder="Search tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 border p-2 rounded-lg"/>
+        <div className="mb-4">
+          <input type="text" placeholder="Search tasks..." value={search} onChange={(e) => handleSearch(e.target.value)} className="w-full border p-2 rounded-lg"/>
         </div>
 
+        {loading && (
+          <p className="text-center text-gray-500">Loading...</p>
+        )}
+
+        {error && (
+          <p className="text-center text-red-500">{error}</p>
+        )}
+
         <div>
-          {searchItems.length === 0 ? (
+          {!loading && items.length === 0 ? (
             <p className="text-center text-gray-500">No tasks found</p>
           ) : ( 
-            searchItems.map((task) => (
+            items.map((task) => (
               <div key={task._id} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
                 <div className="flex items-center gap-2">
                   <input type="checkbox" checked={task.completed} onChange={() => handleToggle(task._id)} />
